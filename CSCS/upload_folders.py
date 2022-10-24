@@ -3,16 +3,26 @@ from getpass import getpass
 import swiftclient
 import os
 
+swclient = None
+username = ""
+password = ""
+project_id = ""
+container = ""
 
-def renew_token(user,pwd,prj):
+
+def renew_token():
+
+    global swclient
+    global username
+    global password
+    global project_id
+
     # Get an unscoped token
-    sess = cscs.get_unscoped_token(user,pwd)
+    sess = cscs.get_unscoped_token(username,password)
 
     # Get a scoped token
-    sc_sess = cscs.get_scoped_token(sess, prj)
+    sc_sess = cscs.get_scoped_token(sess, project_id)
     swclient = cscs.connect(sc_sess)
-
-    return(swclient)
 
 
 def getobjlist(folder):
@@ -29,19 +39,47 @@ def getobjlist(folder):
     return(objlist)
 
 
-def upload(swclient, username, password, project_id, container, obj, contents):
+def putfile(obj, contents):
+    global swclient
+    global container
+
     try:
         swclient.put_object(container=container, obj=obj, contents=contents)
+    except swiftclient.ClientException as e:
+        if e.http_status == 401:    # Unauthorized -- token expired
+            print("---\nYour CSCS access token has expired.")
+            print("Requesting new token...")
+            swclient = renew_token()
+            print("Success.\n---")
+            swclient.put_object(container=container, obj=obj, contents=contents)
+        else:
+            print(str(e.http_status) + " - " + e.msg)
+
+
+def upload(obj, contents, skip):
+    global swclient
+    global container
+
+    try:
+        resp = swclient.head_object(container=container, obj=obj)
+        if type(resp) == dict and int(resp["content-length"]) > 0:     # Object already exists
+            if not skip: putfile(obj, contents)
+        else:
+            putfile(obj, contents)
 
     except swiftclient.ClientException as e:
         if e.http_status == 401:    # Unauthorized -- token expired
             print("---\nYour CSCS access token has expired.")
             print("Requesting new token...")
-            swclient = renew_token(username,password,project_id)
+            swclient = renew_token()
             print("Success.\n---")
-            swclient.put_object(container=container, obj=obj, contents=contents)
+            upload(obj, contents, skip)
+        
+        elif e.http_status == 404:
+            putfile(obj, contents)
+
         else:
-            print(e.http_status + " - " + e.msg)
+            print(str(e.http_status) + " - " + e.msg)
 
 
 if __name__=='__main__':
@@ -79,6 +117,14 @@ if __name__=='__main__':
         for line in fl:
             folders.append(line.strip())
 
+    print("\nHow to handle files that already exist in the container\n---")
+    print("1. Overwrite existing files")
+    print("2. Skip existing files\n---")
+    skip = ''
+    while not (skip=='1' or skip=='2'):
+        skip = input("Choose 1 or 2: ")
+    if skip == '2': skip = True
+
     # Upload files
     print("\nUploading " + str(len(folders)) + " folders\n---\n")
 
@@ -95,13 +141,13 @@ if __name__=='__main__':
                 obj = fname + "/" + os.path.relpath(obj,f).replace("\\","/")
                 print(str(count) + " of " + str(len(objlist)) + " - " + obj)
                 if prefix: obj = prefix + "/" + obj
-                upload(swclient, username, password, project_id, container, obj, contents)
+                upload(obj, contents, skip)
             else:
                 contents = open(obj, 'rb')
                 obj = fname + "/" + os.path.relpath(obj,f).replace("\\","/")
                 print(str(count) + " of " + str(len(objlist)) + " - " + obj)                   
                 if prefix: obj = prefix + "/" + obj
-                upload(swclient, username, password, project_id, container, obj, contents)
+                upload(obj, contents, skip)
                 contents.close()
 
         print("---\nFolder " + fname + " uploaded.\n")
