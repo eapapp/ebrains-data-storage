@@ -49,7 +49,7 @@ def putfile(obj, contents):
         if e.http_status == 401:    # Unauthorized -- token expired
             print("---\nYour CSCS access token has expired.")
             print("Requesting new token...")
-            swclient = renew_token()
+            renew_token()
             print("Success.\n---")
             swclient.put_object(container=container, obj=obj, contents=contents)
         else:
@@ -71,7 +71,7 @@ def upload(obj, contents, skip):
         if e.http_status == 401:    # Unauthorized -- token expired
             print("---\nYour CSCS access token has expired.")
             print("Requesting new token...")
-            swclient = renew_token()
+            renew_token()
             print("Success.\n---")
             upload(obj, contents, skip)
         
