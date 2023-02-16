@@ -1,6 +1,10 @@
 import os
-import requests as rq
 import webbrowser
+import sys
+import subprocess
+import pkg_resources
+from time import sleep
+
 
 APIURL = "https://data-proxy.ebrains.eu/api/v1/buckets/"
 token = None
@@ -152,14 +156,29 @@ def tokenvalid(bucket, token):
         return(False)
 
 
+def setup(package):
+
+    installed = {pkg.key for pkg in pkg_resources.working_set}
+    if not package in installed:
+        print("Installing required packages...\n")
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+        print("\nSetup done.\n---\n")
+  
+    return()
+
+
 if __name__=='__main__':
     # Upload data to an EBRAINS bucket
 
     print("\nUpload data to an EBRAINS bucket\n---\n")
 
+    setup("requests")
+    import requests as rq
+
     auth_url = "https://lab.ebrains.eu/hub/oauth_login?next=https://lab.ebrains.eu/user-redirect/lab/tree/shared/Data%20Curation/EBRAINS-token.ipynb"
     print("Opening your browser for EBRAINS login. You can also copy-paste the following link:")
     print(auth_url)
+    sleep(3)
     webbrowser.open(auth_url)
 
     token = input("\nEBRAINS authentication token: ")
