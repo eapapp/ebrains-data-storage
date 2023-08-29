@@ -39,11 +39,14 @@ def getfiles(folder):
     """
     filelist = []
 
+    to_exclude = (".ds_store", "thumbs.db", )  # system files that should never be uploaded regardless of their presence
+
     for root, dirs, files in os.walk(folder):
         for name in files:
             fpath = os.path.join(root, name)
             cpath = os.path.realpath(__file__)
-            if not fpath == cpath: filelist.append(fpath)
+            if (not fpath == cpath) and (not name.lower() in to_exclude):
+                filelist.append(fpath)
 
     filelist.sort()
     return(filelist)
