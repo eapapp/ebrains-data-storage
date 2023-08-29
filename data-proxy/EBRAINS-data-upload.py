@@ -287,8 +287,13 @@ if __name__=='__main__':
     existing = []
     skip = False
     if filesinbucket(prefix):
-        if args.overwrite is not None:
-            skip = not(args.overwrite)
+        if args.overwrite is True:
+            skip = False
+        elif args.overwrite is False:
+            # Note, since it can also be None, i.e. never defined, we have to do an explicit "is" check, not just typecast
+            # to boolean
+            existing = getobjlist(prefix)
+            skip=True
         else:
             existing = getobjlist(prefix)
             print("\nExisting files in the bucket\n---")
@@ -298,7 +303,6 @@ if __name__=='__main__':
             while not (skip=='1' or skip=='2'):
                 skip = input("Choose 1 or 2: ")
             if skip == '2': skip = True
-        print(skip)
 
     if not skip_check:
         cont = input("\n" + str(len(filelist)) + " files ready to be uploaded. Continue? (y/n): ")
