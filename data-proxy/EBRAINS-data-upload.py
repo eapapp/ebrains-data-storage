@@ -3,29 +3,62 @@ import webbrowser
 import sys
 import subprocess
 import pkg_resources
-from time import sleep
+import argparse
+from time import sleep, perf_counter
 
+
+
+auth_url = "https://lab.ebrains.eu/hub/oauth_login?next=https://lab.ebrains.eu/user-redirect/lab/tree/shared/Data%20Curation/EBRAINS-token.ipynb"
+# If you wish to use the non-interactive CLI, you still need to acquire a token from this jupyterlab instance.
 
 APIURL = "https://data-proxy.ebrains.eu/api/v1/buckets/"
 token = None
 bucket = None
 headers = {}
 
+folder = None
+prefix = None
+
+parser = argparse.ArgumentParser(description="Command line interface to upload data to eBrains")
+parser.add_argument("-f", "--folder", default=".", help="The directory, the CONTENTS OF WHICH, shall be uploaded")
+parser.add_argument("-p", "--prefix", default="", help="Prefix within the bucket to use")
+parser.add_argument("-t", "--token", default=None, help="The api token to authorise your upload")
+parser.add_argument("-b", "--bucket", default=None, help="The bucket to which your data shall be uploaded")
+parser.add_argument("-o", "--overwrite", action="store_true", help="overwrite existing files in the bucket, mutually exclusive with `-s`")
+parser.add_argument("-s", "--skip", action="store_false", dest="overwrite", help="Skip existing files in the bucket, mutually exclusive with `-o`")
+parser.add_argument("-v", "--verbose", action="store_true", help="Display debugging information")
+
+
 
 def getfiles(folder):
+    """
+    Generate a list of all files to upload
+
+    :param folder: Destination to check for contents
+    :return: list of strings : list of all files in folder and subfolders
+    """
     filelist = []
+
+    to_exclude = (".ds_store", "thumbs.db", )  # system files that should never be uploaded regardless of their presence
 
     for root, dirs, files in os.walk(folder):
         for name in files:
             fpath = os.path.join(root, name)
             cpath = os.path.realpath(__file__)
-            if not fpath == cpath: filelist.append(fpath)
+            if (not fpath == cpath) and (not name.lower() in to_exclude):
+                filelist.append(fpath)
 
     filelist.sort()
     return(filelist)
 
 
 def getobjlist(prefix):
+    """
+    Generate a list of all objects already present in the bucket with given prefix
+
+    :param prefix: string, prefix to use to check for existing files
+    :return: list of strings : list of all objects (with given prefix) in bucket
+    """
 
     url = APIURL + bucket
     if prefix: url = url + "?prefix=" + prefix 
@@ -56,6 +89,12 @@ def getobjlist(prefix):
     
 
 def filesinbucket(prefix):
+    """
+    Simple check if the bucket has any contents at all under the given prefix
+
+    :param prefix: string, prefix to check for contents
+    :return: boolean, do any objects exist under this prefix
+    """
 
     url = APIURL + bucket + "/stat"
 
@@ -123,12 +162,19 @@ def upload(url, content):
             
             
 def sendobj(obj, content, existing, skip):
+    """
+    Send the file to the bucket
+
+    If the file already exists, you have the choice to skip it (skip-=True) or overwrite it (skip=false)
+    """
 
     url = APIURL + bucket + "/" + obj
 
     if existing:
         if obj in existing:
-            if not skip:           
+            if skip:
+                pass
+            else:
                 rq.delete(url=url,headers=headers)
                 upload(url, content)
         else:
@@ -168,67 +214,110 @@ def setup(package):
 
 
 if __name__=='__main__':
-    # Upload data to an EBRAINS bucket
-
-    print("\nUpload data to an EBRAINS bucket\n---\n")
-
+    # Handle commandline arguments, if any, and install the required `requests` library
+    args = parser.parse_args()
     setup("requests")
     import requests as rq
 
-    auth_url = "https://lab.ebrains.eu/hub/oauth_login?next=https://lab.ebrains.eu/user-redirect/lab/tree/shared/Data%20Curation/EBRAINS-token.ipynb"
-    print("Opening your browser for EBRAINS login. You can also copy-paste the following link:")
-    print(auth_url)
-    sleep(3)
-    webbrowser.open(auth_url)
+    # If commandline args were offered, slot them into the expected arguments
+    # An empty string is an allowable value but obvious fails a boolean test
+    if args.token is not None:
+        token = args.token
+    if args.bucket is not None:
+        bucket = args.bucket
+    if args.folder is not None:
+        folder = args.folder
+        skip_check = True        # Skip the interactive "continue y/n?" check
+    else:
+        skip_check = False
+    if args.prefix is not None:
+        prefix = args.prefix
+        print("prefix = ", prefix)
 
-    token = input("\nEBRAINS authentication token: ")
-    bucket = input("Bucket name: ")
-    if not(bucket or token): raise SystemExit
+
+    if args.verbose:
+        print("\nUpload data to an EBRAINS bucket\n---\n")
+
+
+
+    if token is None:
+
+        print("Opening your browser for EBRAINS login. You can also copy-paste the following link:")
+        print(auth_url)
+        sleep(3)
+        webbrowser.open(auth_url)
+
+        token = input("\nEBRAINS authentication token: ")
+
+    if bucket is None:
+        bucket = input("Bucket name: ")
+
+    if bucket is None or token is None:
+        print("Bucket or token not provided, exiting")
+        raise SystemExit
     if not tokenvalid(bucket, token):
         print("\nBucket not accessible with this token. Please get a new token and try again.")
         raise SystemExit
 
-    print("\nFolder to upload\n---")
-    print(" - Please note that only the contents of the folder will be uploaded, not the folder itself.")
-    print(" - Empty subfolders are not supported by the EBRAINS storage and will be skipped.")
-    print(" - If you choose the current folder, all files except this Python script will be uploaded.\n")
-    folder = input("Data folder path (press Enter to use current folder): ")
+    if folder is None:
+        print("\nFolder to upload\n---")
+        print(" - Please note that only the contents of the folder will be uploaded, not the folder itself.")
+        print(" - Empty subfolders are not supported by the EBRAINS storage and will be skipped.")
+        print(" - If you choose the current folder, all files except this Python script will be uploaded.\n")
+        folder = input("Data folder path (press Enter to use current folder): ")
 
-    if not folder:
+    if not folder or folder == ".":
         folder = os.path.dirname(os.path.realpath(__file__))
         print("Current folder selected: " + folder)
     elif not os.path.exists(folder):
-        print("Invalid folder path.\n")
+        print("Invalid folder path, exiting\n")
         raise SystemExit
 
-    print("Gathering list of files to be uploaded", end="... ", flush=True)
+    if args.verbose:
+        print("Gathering list of files to be uploaded", end="... ", flush=True)
     filelist = getfiles(folder)
-    print("Done.")
+    if args.verbose:
+        print(f"{len(filelist)} files found")
 
-    print("\nDestination folder in the bucket\n---")
-    prefix = input(" - If you wish to copy to an existing folder in the bucket, please specify its path.\n - If the folder does not exist, it will be created.\n\nBucket folder to copy to: ")
+    if prefix is None:
+        print("\nDestination folder in the bucket\n---")
+        prefix = input(" - If you wish to copy to an existing folder in the bucket, please specify its path.\n - If the folder does not exist, it will be created.\n\nBucket folder to copy to: ")
     prefix = prefix.strip().strip("/").replace("\\","/").replace("//","/")
 
     existing = []
     skip = False
     if filesinbucket(prefix):
-        existing = getobjlist(prefix)
-        print("\nExisting files in the bucket\n---")
-        print("1. Overwrite existing files")
-        print("2. Skip existing files\n---")
-        skip = ''
-        while not (skip=='1' or skip=='2'):
-            skip = input("Choose 1 or 2: ")
-        if skip == '2': skip = True
+        if args.overwrite is True:
+            skip = False
+        elif args.overwrite is False:
+            # Note, since it can also be None, i.e. never defined, we have to do an explicit "is" check, not just typecast
+            # to boolean
+            existing = getobjlist(prefix)
+            skip=True
+        else:
+            existing = getobjlist(prefix)
+            print("\nExisting files in the bucket\n---")
+            print("1. Overwrite existing files")
+            print("2. Skip existing files\n---")
+            skip = ''
+            while not (skip=='1' or skip=='2'):
+                skip = input("Choose 1 or 2: ")
+            if skip == '2': skip = True
 
-    cont = input("\n" + str(len(filelist)) + " files ready to be uploaded. Continue? (y/n): ")
-    if cont != "y":
-        print("Upload cancelled by user.\n")
-        raise SystemExit
+    if not skip_check:
+        cont = input("\n" + str(len(filelist)) + " files ready to be uploaded. Continue? (y/n): ")
+        if cont != "y":
+            print("Upload cancelled by user.\n")
+            raise SystemExit
     else:
-        print("\nUploading your files to the bucket " + bucket + ":\n---")
+        if args.verbose:
+            print("\nUploading your files to the bucket " + bucket + ":\n---")
+        t0 = perf_counter()
         for fname in filelist:
             with open(fname,"rb") as content:
                 obj = os.path.relpath(fname,folder).replace("\\","/")
                 if prefix: obj = prefix + "/" + obj
                 sendobj(obj, content, existing, skip)
+        t1 = perf_counter()
+        if args.verbose:
+            print(f"Done in {t1-t0:.1n}s")
