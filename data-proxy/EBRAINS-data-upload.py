@@ -4,7 +4,7 @@ import sys
 import subprocess
 import pkg_resources
 from time import sleep
-
+import tkinter as tk
 
 APIURL = "https://data-proxy.ebrains.eu/api/v1/buckets/"
 token = None
@@ -17,9 +17,10 @@ def getfiles(folder):
 
     for root, dirs, files in os.walk(folder):
         for name in files:
-            fpath = os.path.join(root, name)
-            cpath = os.path.realpath(__file__)
-            if not fpath == cpath: filelist.append(fpath)
+            if not name.startswith('._'):    # Ignore MacOS metadata files            
+                fpath = os.path.join(root, name)
+                cpath = os.path.realpath(__file__)
+                if not fpath == cpath: filelist.append(fpath)
 
     filelist.sort()
     return(filelist)
@@ -84,11 +85,24 @@ def newtoken():
     global token
     global headers
 
-    print("---\nYour EBRAINS login token has expired. Please get a new token and copy it here.\n")
-    token = input("EBRAINS auth token: ")
-    print("---")
+    print("---\nYour EBRAINS login token has expired. Please get a new token on the clipboard:")
+    print(auth_url)
+    sleep(3)
+    webbrowser.open(auth_url)
+    
+    input('Press Enter once you have copied your EBRAINS authentication token to the clipboard.')
+    token = root.clipboard_get()
+    if not token.startswith('eyJ'): token = ''
 
-    if not token: raise SystemExit
+    while not token:
+        resp = input('No token found on the clipboard, please try again. Type Q to quit.')
+        if resp.lower() == 'q':
+            raise SystemExit
+        else:
+            token = root.clipboard_get()
+            if not token.startswith('eyJ'): token = ''
+
+    print("---")
 
     headers = {
         "accept": "application/json",
@@ -181,7 +195,22 @@ if __name__=='__main__':
     sleep(3)
     webbrowser.open(auth_url)
 
-    token = input("\nEBRAINS authentication token: ")
+    input('\nPress Enter once you have copied your EBRAINS authentication token to the clipboard.')
+
+    root = tk.Tk()
+    root.withdraw()
+    token = root.clipboard_get()
+    if not token.startswith('eyJ'): token = ''
+
+    while not token:
+        resp = input('No token found on the clipboard, please try again. Type Q to quit.')
+        if resp.lower() == 'q':
+            raise SystemExit
+        else:
+            token = root.clipboard_get()
+            if not token.startswith('eyJ'): token = ''
+     
+    # token = input("\nEBRAINS authentication token: ")
     bucket = input("Bucket name: ")
     if not(bucket or token): raise SystemExit
     if not tokenvalid(bucket, token):
@@ -232,3 +261,5 @@ if __name__=='__main__':
                 obj = os.path.relpath(fname,folder).replace("\\","/")
                 if prefix: obj = prefix + "/" + obj
                 sendobj(obj, content, existing, skip)
+
+print('---\n')
