@@ -152,9 +152,14 @@ def sendobj(obj, content, existing, skip):
         upload(url, content)
 
 
-def tokenvalid(bucket, token):
+def tokenvalid(token):
 
     global headers
+    global bucket
+
+    if bucket.startswith('https://'):
+        bucket = bucket[8:].split('/')[1].split('#')[0]
+        if '?prefix=' in bucket: bucket = bucket.split('?prefix=')[0]
 
     url = APIURL + bucket + "/stat"
     headers = {
@@ -213,7 +218,7 @@ if __name__=='__main__':
     # token = input("\nEBRAINS authentication token: ")
     bucket = input("Bucket name: ")
     if not(bucket or token): raise SystemExit
-    if not tokenvalid(bucket, token):
+    if not tokenvalid(token):
         print("\nBucket not accessible with this token. Please get a new token and try again.")
         raise SystemExit
 
