@@ -5,7 +5,7 @@ EBRAINS-data-upload.py is a Python script that lets you upload data to your EBRA
 ## How to use
  - Start the script from your command prompt or terminal/shell: ```python EBRAINS-data-upload.py```
  - You will be redirected to your browser for the EBRAINS login.
- - To obtain your EBRAINS authentication token, please start the Jupyter lab as prompted, and run the notebook. This will give you a button, please click it to copy your token to the clipboard. Then paste the token back into the Python window.
+ - To obtain your EBRAINS authentication token, please start the Jupyter lab as prompted, and run the notebook. This will give you a button, please click it to copy your token to the clipboard. Then go back to the Python window and press Enter to fetch the token.
  - Follow the instructions to provide the bucket name, the folder to upload to, and the path to the data files.
  - The upload progress will be listed file by file. Please keep the window open until it is finished.
  - If for any reason the upload is interrupted, you can run it again and select to skip existing files, then it will continue where it left off.
