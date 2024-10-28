@@ -95,7 +95,7 @@ if __name__=='__main__':
     else:
         cont2_objdict = get_cscs_objdict(cont2)
     
-    print('Comparing containers...')
+    print('---\nComparing containers...')
     for obj in cont1_objdict:
         if obj in cont2_objdict:
             if not cont1_objdict[obj]['hash'] == cont2_objdict[obj]['hash']:
