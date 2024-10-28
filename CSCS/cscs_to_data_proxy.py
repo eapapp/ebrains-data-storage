@@ -8,6 +8,8 @@ DP_APIURL = "https://data-proxy.ebrains.eu/api/v1/buckets/"
 headers = ''
 swclient = None
 bucket = ''
+CHUNK_SIZE = 536870912       # 500 MiB
+# CHUNK_SIZE = 1073741824    # 1 GiB
 
 
 def swift_list(container_name):
@@ -49,7 +51,8 @@ def get_cscs_objlist(container_url):
 def get_object(container_url, obj):
     container_name = container_url.split('/')[-1].split('?')[0]    # Discard prefix
     try:
-        header, contents = swclient.get_object(container_name, obj)
+        header, contents = swclient.get_object(container=container_name, obj=obj, resp_chunk_size=CHUNK_SIZE)
+        # contents returned as iterable in case obj size > CHUNK_SIZE
     except http.client.IncompleteRead as icread:
         print('Exception: ' + str(icread))
         print('Re-trying...')
