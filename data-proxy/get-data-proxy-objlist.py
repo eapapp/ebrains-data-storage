@@ -16,7 +16,7 @@ def getobjlist(url, headers, marker):
         for obj in objects:
             objlist.append(obj["name"])
 
-        if len(objects)==10000:
+        if len(objects)==1000:
             marker = objlist[-1]
             nextpage = getobjlist(url, headers, marker)
             objlist.extend(nextpage)
