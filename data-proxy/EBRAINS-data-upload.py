@@ -123,17 +123,20 @@ def upload(url, content):
             uploadurl = resp.json()["url"]
             resp = rq.put(uploadurl,content)
 
-            if resp.status_code == 201: # HTTP 201 Created
+            if resp.status_code == 201 or resp.status_code == 200: # HTTP 201 Created, HTTP 200 OK
                 print("- Done.")
                 break
             elif resp.status_code == 401: # HTTP 401 Unauthorized
+                print()
                 newtoken()
 
         elif resp.status_code == 401: # HTTP 401 Unauthorized
+            print()
             newtoken()
 
-    else:
-        print("- Upload failed: " + str(resp.status_code) + " " + resp.reason)
+        else:
+            print("- Upload failed: " + str(resp.status_code) + " " + resp.reason)
+            print("Retrying...", end=' ', flush=True)
             
             
 def sendobj(obj, content, existing, skip):
@@ -177,6 +180,7 @@ def tokenvalid(token):
 
 def setup(package):
 
+    # subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'setuptools'])
     installed = {pkg.key for pkg in pkg_resources.working_set}
     if not package in installed:
         print("Installing required packages...\n")
@@ -213,10 +217,9 @@ if __name__=='__main__':
             raise SystemExit
         else:
             token = root.clipboard_get()
-            if not token.startswith('eyJ'): token = ''
-     
+            if not token.startswith('eyJ'): token = ''     
     # token = input("\nEBRAINS authentication token: ")
-    bucket = input("Bucket name: ")
+    bucket = input("Bucket name (typically, d- followed by your dataset UUID): ")
     if not(bucket or token): raise SystemExit
     if not tokenvalid(token):
         print("\nBucket not accessible with this token. Please get a new token and try again.")
