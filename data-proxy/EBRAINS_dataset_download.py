@@ -36,7 +36,7 @@ def getobjlist(url, marker):
             # if int(obj['bytes']) < 104857600:    # file size limit for testing
             objlist.append(obj['name'])
 
-        if len(objects)==10000:
+        if len(objects) > 0:
             marker = objlist[-1]
             nextpage = getobjlist(url, marker)
             objlist.extend(nextpage)
