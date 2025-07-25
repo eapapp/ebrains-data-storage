@@ -44,6 +44,11 @@ def getobjlist(prefix):
         for obj in objects:
             objlist.append(obj["name"])
 
+        if len(objects) > 0:
+            marker = objlist[-1]
+            nextpage = getobjlist(url, headers, marker)
+            objlist.extend(nextpage)
+        
         return(objlist)
 
     elif resp.status_code == 401:
