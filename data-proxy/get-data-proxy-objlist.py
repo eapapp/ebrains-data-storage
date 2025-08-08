@@ -24,6 +24,7 @@ def getobjlist(url, headers, marker):
         return(objlist)
 
     else:
+        bucket = url.split(APIURL)[1]
         print("Data proxy API error: " + resp.reason + " - " + bucket + "\n")
         raise SystemExit
     
