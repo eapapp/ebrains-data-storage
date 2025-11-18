@@ -2,7 +2,7 @@ import os
 import webbrowser
 import sys
 import subprocess
-import pkg_resources
+import importlib.metadata as meta
 from time import sleep
 import tkinter as tk
 
@@ -10,6 +10,7 @@ APIURL = "https://data-proxy.ebrains.eu/api/v1/buckets/"
 token = None
 bucket = None
 headers = {}
+marker = ''
 
 
 def getfiles(folder):
@@ -28,17 +29,15 @@ def getfiles(folder):
 
 def getobjlist(prefix):
 
-    url = APIURL + bucket
-    if prefix: url = url + "?prefix=" + prefix 
-    if "?" in url:
-        url = url + "&limit=0"
-    else:
-        url = url + "?limit=0"
+    global marker
+
+    url = APIURL + bucket + "?limit=0"
+    if prefix: url += "&prefix=" + prefix 
+    if marker: url += "&marker=" + marker
 
     resp = rq.get(url=url,headers=headers)
 
     if resp.status_code == 200:
-
         objlist = []
         objects = resp.json()["objects"]
         for obj in objects:
@@ -46,18 +45,19 @@ def getobjlist(prefix):
 
         if len(objects) > 0:
             marker = objlist[-1]
-            nextpage = getobjlist(url, headers, marker)
+            nextpage = getobjlist(prefix)
             objlist.extend(nextpage)
         
         return(objlist)
 
     elif resp.status_code == 401:
         newtoken()
-        objlist = getobjlist(bucket, token)
+        objlist = getobjlist(prefix)
         return(objlist)
 
     else:
-        print("Data proxy API error: " + resp.reason + " - " + bucket + "\n")
+        bucket_name = url.split(APIURL)[1].split('?')[0]
+        print("Data proxy API error: " + resp.reason + " - " + bucket_name + "\n")
         raise SystemExit
     
 
@@ -184,9 +184,8 @@ def tokenvalid(token):
 
 
 def setup(package):
-
-    # subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'setuptools'])
-    installed = {pkg.key for pkg in pkg_resources.working_set}
+   
+    installed = [pkg.name for pkg in meta.distributions()]
     if not package in installed:
         print("Installing required packages...\n")
         subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
@@ -275,4 +274,4 @@ if __name__=='__main__':
                 if prefix: obj = prefix + "/" + obj
                 sendobj(obj, content, existing, skip)
 
-print('---\n')
+    print('---\n')
