@@ -2,17 +2,17 @@ import requests as rq
 import webbrowser
 import sys
 import subprocess
-import pkg_resources
+import importlib.metadata as meta
 from time import sleep
 import os
 
 APIURL = 'https://data-proxy.ebrains.eu/api/v1/datasets/'
 headers = ''
-
+prefix = ''
 
 def setup(package):
 
-    installed = {pkg.key for pkg in pkg_resources.working_set}
+    installed = [pkg.name for pkg in meta.distributions()]
     if not package in installed:
         print("Installing required packages...\n")
         subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
@@ -23,8 +23,9 @@ def setup(package):
 
 def getobjlist(url, marker):
 
-    if not 'limit=' in url: url = url + '?limit=0'
-    if marker: url = url + '&marker=' + marker
+    url += '?limit=0'
+    if prefix: url += '&prefix=' + prefix
+    if marker: url += '&marker=' + marker
 
     resp = rq.get(url=url,headers=headers)
 
@@ -38,6 +39,7 @@ def getobjlist(url, marker):
 
         if len(objects) > 0:
             marker = objlist[-1]
+            url = url.split('?')[0]
             nextpage = getobjlist(url, marker)
             objlist.extend(nextpage)
 
@@ -78,11 +80,14 @@ def tokenvalid(dataset, token):
 
 if __name__=='__main__':
   
-    print('\nDownload all files from an EBRAINS dataset\n---\n')
+    print('\nDownload all files or a selected folder from an EBRAINS dataset\n---\n')
     print('Note: for controlled access data, you need to accept the terms of service in the e-mail first.')
     print('The files will be downloaded in the current directory unless you specify otherwise.')
-    dataset = input('\nDataset ID: ')
+    dataset = input('\nDataset UUID (without d-): ')
     if not dataset: raise SystemExit
+
+    prefix = input('Folder to download: ').strip()
+    prefix = prefix.replace('\\','/')
 
     setup("requests")
     import requests as rq
@@ -104,6 +109,12 @@ if __name__=='__main__':
         'Authorization': 'Bearer ' + token
     }
 
+    objlist = getobjlist(url, '')
+
+    if len(objlist) == 0:
+        print('---\nNo files in this folder, or the folder does not exist.\n')
+        raise SystemExit
+
     dld_folder = input('\nFolder to download the data to (enter an absolute or relative path): ')
     if not dld_folder:
         dld_folder = os.getcwd()
@@ -112,7 +123,6 @@ if __name__=='__main__':
         dld_folder = os.path.join(os.getcwd(), dld_folder)
 
     print('---')
-    objlist = getobjlist(url, '')
     for obj in objlist:
         fname = obj.split('/')[-1]
         fpath = obj[:len(obj)-len(fname)]        
